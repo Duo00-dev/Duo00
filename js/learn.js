@@ -4,15 +4,7 @@ const openSuperDuolingoPage = () => {
   location.href = "../html/superduolingo.html"
 }
 
-const getLanguageFullForm = (languageCode) => {
-  switch (languageCode) {
-    case 'de': return "German"
-    case 'ja': return "Japanese"
-    case 'fr': return "French"
-    case 'es': return "Spanish"
-    default: "Languages"
-  }
-}
+const getLanguageFullForm = (languageCode) => getCourseName(languageCode)
 const getLanguageFlagPath = (languageCode) => {
   return `../assets/svg/country-flags/${languageCode}-flag.svg`
 }
@@ -47,20 +39,33 @@ const openDialogBoxes = (event) => {
 }
 let sectionData;
 async function fetchSectionData(lang, sectionId) {
+  // Only a few courses have remote content; the rest are generated locally.
+  if (!hasRemoteContent(lang)) {
+    sectionData = buildSectionData(lang, sectionId);
+    localStorage.setItem("sectionData", JSON.stringify(sectionData));
+    showLessonsInSection();
+    return;
+  }
+
   try {
     let response = await fetch(`https://duolingo-serverless-endpoint.vercel.app/api/section-details?lang=${lang}&section=${sectionId}`);
     sectionData = await response.json();
+
+    // The endpoint answers 200 with a message when it has nothing for a course.
+    if (!sectionData || !sectionData.section) {
+      sectionData = buildSectionData(lang, sectionId);
+    }
+
     localStorage.setItem("sectionData", JSON.stringify(sectionData));
     showLessonsInSection();
 
   } catch (error) {
     console.error('Error fetching data:', error);
-    return;
+    sectionData = buildSectionData(lang, sectionId);
+    localStorage.setItem("sectionData", JSON.stringify(sectionData));
+    showLessonsInSection();
   }
 }
-// This should be replaced with value from local storage ========================
-fetchSectionData("es", 1);
-//======================End of JSON==============================
 
 const placeSectionList = () => {
   let sectionList = `<div class="section-container">
@@ -134,9 +139,10 @@ const getUserDataFromSessionStorage = () => {
 
 const placeuserStatistics = () => {
   let userData = getUserDataFromSessionStorage();
-  document.title = `Duolingo - The world's best way to learn ${getLanguageFullForm(userData.learnLang)}`
+  let activeCourse = getActiveCourse(userData);
+  document.title = `Duolingo - The world's best way to learn ${getLanguageFullForm(activeCourse)}`
   document.querySelectorAll("#profile-image").forEach(item => item.src = userData.profileImage);
-  document.querySelector(".country-flag").src = getLanguageFlagPath(userData.learnLang);
+  document.querySelector(".country-flag").src = getLanguageFlagPath(activeCourse);
   document.querySelectorAll(".fire-text").forEach(item => item.textContent = userData.xp);
   document.querySelectorAll(".heart-text").forEach(item => item.textContent = userData.hearts);
   document.querySelectorAll(".gem-text").forEach(item => item.textContent = userData.gems);
@@ -551,3 +557,93 @@ const animationFromJSON = (ref, path, autoplay = true) => {
 }
 
 animationFromJSON(loadingPage, animationPath);
+
+// ---------------------------------------------------------------------------
+// Course switcher
+// ---------------------------------------------------------------------------
+
+const saveUserData = (userData) => {
+  sessionStorage.setItem("user-info", JSON.stringify(userData));
+  // courseSync.js listens for this and mirrors the change to Firestore.
+  document.dispatchEvent(new CustomEvent("courses-changed"));
+}
+
+const switchToCourse = (code) => {
+  let userData = getUserDataFromSessionStorage();
+  if (!userData || !isKnownCourse(code)) { return }
+
+  userData.courses = getEnrolledCourses(userData);
+  if (!userData.courses.includes(code)) { userData.courses.push(code) }
+  userData.learnLang = code;
+
+  saveUserData(userData);
+  location.reload();
+}
+
+const enrollInAllCourses = () => {
+  let userData = getUserDataFromSessionStorage();
+  if (!userData) { return }
+
+  userData.courses = getAllCourseCodes();
+  saveUserData(userData);
+  renderCourseSwitcher();
+}
+
+const buildCourseRow = (code, isActive) => `
+  <button type="button" class="course-row${isActive ? " active" : ""}" data-course="${code}">
+    <img src="${getLanguageFlagPath(code)}" alt="" class="course-row-flag" />
+    <span>${getCourseName(code)}</span>
+  </button>`
+
+const renderCourseSwitcher = () => {
+  const menu = document.getElementById("course-switcher-menu");
+  if (!menu) { return }
+
+  const userData = getUserDataFromSessionStorage();
+  const enrolled = getEnrolledCourses(userData);
+  const active = getActiveCourse(userData);
+  const available = getAllCourseCodes().filter(code => !enrolled.includes(code));
+
+  let markup = `<p class="course-menu-heading">My courses</p>`;
+  markup += enrolled.map(code => buildCourseRow(code, code === active)).join("");
+
+  if (available.length) {
+    markup += `<p class="course-menu-heading">Add a course</p>`;
+    markup += `<button type="button" class="course-add-all" id="course-add-all">Add all ${available.length} courses</button>`;
+    markup += available.map(code => buildCourseRow(code, false)).join("");
+  }
+
+  menu.innerHTML = markup;
+
+  menu.querySelectorAll(".course-row").forEach(row => {
+    row.addEventListener("click", () => switchToCourse(row.dataset.course));
+  });
+  menu.querySelector("#course-add-all")?.addEventListener("click", enrollInAllCourses);
+}
+
+const setupCourseSwitcher = () => {
+  const toggle = document.getElementById("course-switcher-toggle");
+  const menu = document.getElementById("course-switcher-menu");
+  if (!toggle || !menu) { return }
+
+  renderCourseSwitcher();
+
+  toggle.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const isOpen = !menu.classList.toggle("hidden");
+    toggle.setAttribute("aria-expanded", String(isOpen));
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!menu.contains(event.target)) {
+      menu.classList.add("hidden");
+      toggle.setAttribute("aria-expanded", "false");
+    }
+  });
+}
+
+setupCourseSwitcher();
+
+// Called last: locally generated courses render synchronously, so every
+// function it reaches must already be defined.
+fetchSectionData(getActiveCourse(getUserDataFromSessionStorage()), 1);

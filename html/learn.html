@@ -71,16 +71,26 @@
         <!----------------------------------- Right sidebar ------------------------------------------------>
         <div class="right-sidebar">
           <div class="right-sidebar-header">
-            <a href="" class="button-in-sidebar">
-              <span class="icon-and-text-wrap">
-                <div class="icon-in-button">
-                  <img
-                    src="../assets/svg/country-flags/transparent.svg"
-                    class="country-flag"
-                  />
-                </div>
-              </span>
-            </a>
+            <div class="course-switcher">
+              <button
+                type="button"
+                class="button-in-sidebar course-switcher-toggle"
+                id="course-switcher-toggle"
+                aria-haspopup="true"
+                aria-expanded="false"
+                aria-label="Switch course"
+              >
+                <span class="icon-and-text-wrap">
+                  <div class="icon-in-button">
+                    <img
+                      src="../assets/svg/country-flags/transparent.svg"
+                      class="country-flag"
+                    />
+                  </div>
+                </span>
+              </button>
+              <div class="course-switcher-menu hidden" id="course-switcher-menu"></div>
+            </div>
             <a href="" class="button-in-sidebar">
               <span class="icon-and-text-wrap">
                 <div class="icon-in-button">
@@ -179,6 +189,8 @@
     ></script>
   </body>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.7.7/lottie.min.js"></script>
+  <script src="../js/courses.js"></script>
   <script src="../js/learn.js"></script>
+  <script src="../js/courseSync.js" type="module"></script>
   <script src="../js/updateUserData.js" type="module"></script>
 </html>
