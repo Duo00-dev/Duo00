@@ -39,7 +39,25 @@ const makepayment = (prefillData) => {
 };
 
 const setSuperStatus=()=>{
-    localStorage.setItem("hearts",1000);
-    localStorage.setItem("xpCount",100);
+    // Mark the user as Super for the free trial without awarding XP (which was
+    // causing the lesson skip bug). We still update the session user-info so the
+    // UI shows unlimited hearts immediately.
+    localStorage.setItem("isSuper", "true");
+
+    try {
+        let sessionUser = JSON.parse(sessionStorage.getItem("user-info") || '{}');
+        if (sessionUser && Object.keys(sessionUser).length > 0) {
+            sessionUser.hearts = 1000;
+            sessionStorage.setItem("user-info", JSON.stringify(sessionUser));
+        } else {
+            // Fallback for anonymous users: keep hearts in localStorage so UI can read it
+            localStorage.setItem("hearts", 1000);
+        }
+    } catch (e) {
+        console.error('Failed to set super status in sessionStorage', e);
+        localStorage.setItem("hearts", 1000);
+    }
+
+    // Do NOT set xpCount here — that was incrementing lessons. Redirect to learn page.
     window.location.href="learn.html"
 }
