@@ -40,6 +40,6 @@ const makepayment = (prefillData) => {
 
 const setSuperStatus=()=>{
     localStorage.setItem("hearts",1000);
-    localStorage.setItem("xpCount",100);
+    localStorage.setItem("xpCount",0);
     window.location.href="learn.html"
 }
